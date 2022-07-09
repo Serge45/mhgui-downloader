@@ -1,102 +1,53 @@
-from typing import Tuple, List, Dict
-import re
-import json
-from lzstring import LZString
-import requests
-from bs4 import BeautifulSoup
-import pyjsparser
+import argparse
+import os
+import time
+from mhgui_downloader.extractor import MHGMetaFetcher, MHG_URL
 
-ROOT_URL = 'https://www.mhgui.com'
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--url', type=str, required=True)
+    parser.add_argument('--delay', type=float, required=False, default=1)
+    parser.add_argument('--dry', action='store_true')
+    parser.add_argument('--output', type=str, default='.')
+    args = parser.parse_args()
+    output_folder = args.output
 
-def to_base_36_str(n: int) -> str:
-    if n == 0:
-        return '0'
+    if not os.path.exists(output_folder):
+        print(f'{output_folder} does not exist')
+        return
+    elif not os.path.isdir(output_folder):
+        print(f'{output_folder} is not a folder')
+        return
 
-    chars = '0123456789abcdefghijklmnopqrstuvwxyz'
-    m = 36
-    res = []
+    if args.delay < 0.5:
+        print(f'delay with {args.delay} is too short')
+        return
+        
+    fetcher = MHGMetaFetcher(args.url)
 
-    while n > 0:
-        res.append(chars[n % m])
-        n //= m
+    for i, _ in enumerate(fetcher.volumes):
+        vol_info = fetcher.get_volume_infos(i)
+        vol_name = vol_info['cname']
+        folder = os.path.join(output_folder, vol_name)
 
-    return ''.join(res[::-1])
+        if not os.path.exists(folder):
+            os.mkdir(folder)
 
-def extract_secret_js(url: str) -> str:
-    res = requests.get(url)
-    assert res.status_code == 200
-    soup = BeautifulSoup(res.text, 'html.parser')
-    js = soup.select('script')
-    js = next(filter(lambda j: len(j.text) and j.attrs.get('id') is None, js))
-    return js.text
+        num_pages = len(vol_info['files'])
+        print(f'{num_pages} pages to be downloaded for {vol_name}')
 
-def compose(p: str, a: int, c: int, k: List[str], e: int):
-    d = {}
-    def e(c):
-        # original JS implementation
-        #return (c < a ? "" : e(parseInt(c / a))) + ((c = c % a) > 35 ? String.fromCharCode(c + 29) : c.toString(36))
-        hi = '' if c < a else e(c // a)
-        c = c % a
-        lo = chr(c + 29) if c > 35 else to_base_36_str(c)
-        return hi + lo
+        for j, p_name in enumerate(vol_info['files']):
+            ext = p_name.split('.')[-1]
+            page_path = os.path.join(folder, f'{j:04}.{ext}')
+            print(f'Downloading {vol_name} page {j} to {page_path}')
 
-    while c > 0:
-        c -= 1
-        d[e(c)] = k[c] if k[c] != '' else e(c)
+            if not args.dry:
+                content = fetcher.get_volume_page_content(i, j)
 
-    results = re.split(r'(\b\w+\b)', p)
-    result = ''.join(d[r] if r in d else r for r in results)
-    result = re.search(r'^.*\((\{.*\})\).*$', result).group(1)
-    return json.loads(result)
+                with open(page_path, 'wb') as f:
+                    f.write(content)
 
-    # original JS implementation
-    # if (!''.replace(/^/, String)) {
-    #     while (c--)
-    #         d[e(c)] = k[c] || e(c);
-    #     k = [function(e) {
-    #         return d[e]
-    #     }
-    #     ];
-    #     e = function() {
-    #         return '\\w+'
-    #     }
-    #     ;
-    #     c = 1;
-    # }
-    # ;while (c--)
-    #     if (k[c])
-    #         p = p.replace(new RegExp('\\b' + e(c) + '\\b','g'), k[c]);
-    # return p;
-
-
-def decode_img_infos(js_str: str):
-    i = js_str.find('(')
-    j = js_str.rfind(')')
-    js_str = js_str[i+1:j]
-    parsed = pyjsparser.parse(js_str)
-    args = parsed['body'][1]['expression']['expressions']
-    p = args[0]['value']
-    a = int(args[1]['raw'])
-    c = int(args[2]['raw'])
-    k = args[3]['callee']['object']['value']
-    e = int(args[4]['raw'])
-    return compose(p, a, c, decode_k(k), e)
-
-def get_volumes(url: str) -> Tuple[str]:
-    res = requests.get(url)
-    assert res.status_code == 200
-    soup = BeautifulSoup(res.text, 'html.parser')
-    sections = soup.select('.chapter-list a')
-    return tuple((s.attrs.get('title'), s.attrs.get('href')) for s in sections)
-
-def decode_k(k: str):
-    decoded = LZString.decompressFromBase64(k)
-    return decoded.split('|')
+            time.sleep(args.delay)
 
 if __name__ == '__main__':
-    # print(get_volumes('https://www.mhgui.com/comic/751/'))
-    i = to_base_36_str(1000)
-    k = decode_k('O4UwRgDgPlEHYHMoEYCsAGZUBWEkQCcQBJOASwBcoBxagZXQHYB9dAZgDYwb6nXOeDFu1TdaQ/qkF92AFjG9hbWdKVsFE9mxjiZbAEwa9+1f2RGlWU+3QX+6HYtb6AnHfSvr+gBzufXxj9GLy4Qr1Fw6zZg3SVAqN8veWsMdwxrWTcMlwzE2NZZbwz4/PRZGKcy0NLZDgyI0rYimqkalRr1DO0awwyTGvMMrBrbDIdGrImM5NL9dsr9XtnuyvRm1ZKN63Rq1brS9AbV1tWZ0+3Og5XNNfcPO+HVhwAzMgAbEABnKEAabyZAd2UoABjOAAQwAtiAUGw2OgHECyAATKCQMhAqCAZb9ADKugAg9FFgyEopHbfqrHIHSaVZDjSqoR6aRZeQazekyfSjWY0zTISnc8lUvIC6zITbcirc3YS4VHbknblneXCy5U64yZBLKmk7nMqms4TUvzKzR0tJamSoDWaFxm4QuHVWvWsFwcyrO6zeXkyD3uwWabzrP2ir3ir2S0PumVeuVehUx91Gr2q4TeS1em2sbz2r2O9DW9wuJNOhO2lTeAwAWQAYgA1ACCzAACgBpesuACiAA0ACIAewgzwAnp8kMgOKhvLJFqg2FhPm9oa4coQQAA3YjI5AwzBQOAgAAeFHXKLePaBAGtmED0Z8KKCKABXb5MKAAKRfdCgZHBCC7d9BsE+LAeRUD44CgCgCHvKFXnIT4AAsQGRUoXCDW0Q1tMMMOsFxI1taMS24CA7zg90uS9F1NEYflKM9YQOHmTQOGLVgmOsDhUzo9MdizOicw4CiZH4lJaJY/DWFQajzQDc1UPE9DxMwhSUlw8SxMOWNhFQBjzWYw5C0OX1BJUnYNJYxSmEM4RGGkqzZKYeSmHMxh9kqRhjLc6xGFMphtLolzKP0xhdI4SS6Icjg7I4GyWMs1hGA4lisjocsAAlPIEqyc0YHi4q4xh0CAA===')
-    t = extract_secret_js('https://www.mhgui.com/comic/1501/13299.html')
-    info = decode_img_infos(t)
-    print(info)
+    main()
