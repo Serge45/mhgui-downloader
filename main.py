@@ -1,7 +1,7 @@
 import argparse
 import os
 import time
-from mhgui_downloader.extractor import MHGMetaFetcher, MHG_URL
+from mhgui_downloader.extractor import MHGMetaFetcher
 
 def main():
     parser = argparse.ArgumentParser()
