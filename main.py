@@ -1,7 +1,7 @@
 import argparse
 import os
 import time
-from mhgui_downloader.extractor import MHGMetaFetcher
+from mhgui_downloader.extractor import MHGMetaFetcher, InvalidResponse
 
 def main():
     parser = argparse.ArgumentParser()
@@ -9,6 +9,7 @@ def main():
     parser.add_argument('--delay', type=float, required=False, default=1, help='Delay seconds before downloading next page')
     parser.add_argument('--dry', action='store_true', help='Just parse meta info, will not download pages')
     parser.add_argument('--output', type=str, default='.', help='Output folder, the default is .')
+    parser.add_argument('--num_max_retry', type=int, default=10, help='Upper bound of retry while downloading page')
     args = parser.parse_args()
     output_folder = args.output
 
@@ -46,10 +47,20 @@ def main():
                 continue
 
             if not args.dry:
-                content = fetcher.get_volume_page_content(i, j)
-
-                with open(page_path, 'wb') as f:
-                    f.write(content)
+                for _ in range(max(args.num_max_retry, 1)):
+                    try:
+                        content = fetcher.get_volume_page_content(i, j)
+                        with open(page_path, 'wb') as f:
+                            f.write(content)
+                        break
+                    except InvalidResponse:
+                        print(f'Encounter error while downloading volume {i} page {j}, retry now')
+                        time.sleep(1)
+                    except:
+                        print(f'Encounter unknown error while processing volume {i} page {j}, retry now')
+                        time.sleep(1)
+                else:
+                    print(f'Unable to download volume {i} page {j}')
 
             time.sleep(args.delay)
 

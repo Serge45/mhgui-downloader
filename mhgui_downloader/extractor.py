@@ -10,6 +10,9 @@ import pyjsparser
 IMG_ROOT_URL = 'https://i.hamreus.com'
 MHG_URL = 'https://www.mhgui.com'
 
+class InvalidResponse(Exception):
+    pass
+
 class MHGMetaFetcher:
     def __init__(self, url: str):
         self.url = url
@@ -27,7 +30,10 @@ class MHGMetaFetcher:
         params = {'e': info['sl']['e'], 'm': info['sl']['m']}
         headers = {'Referer': 'https://www.mhgui.com/'}
         res = requests.get(page_url, params=params, headers=headers)
-        assert res.status_code == 200
+
+        if res.status_code != 200:
+            raise InvalidResponse()
+
         return res.content
 
     def _decode_volume_infos(self, js_str: str):
