@@ -41,6 +41,10 @@ def main():
             page_path = os.path.join(folder, f'{j:04}.{ext}')
             print(f'Downloading {vol_name} page {j} to {page_path}')
 
+            if os.path.exists(page_path) and os.path.isfile(page_path):
+                print(f'{page_path} already exists, skip')
+                continue
+
             if not args.dry:
                 content = fetcher.get_volume_page_content(i, j)
 
