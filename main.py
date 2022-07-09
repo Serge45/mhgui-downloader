@@ -20,7 +20,7 @@ def main():
         return
 
     if args.delay < 0.5:
-        print(f'delay with {args.delay} is too short')
+        print(f'delay with {args.delay} seconds is too short')
         return
         
     fetcher = MHGMetaFetcher(args.url)
