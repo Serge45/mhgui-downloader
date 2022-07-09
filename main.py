@@ -5,10 +5,10 @@ from mhgui_downloader.extractor import MHGMetaFetcher, MHG_URL
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--url', type=str, required=True)
-    parser.add_argument('--delay', type=float, required=False, default=1)
-    parser.add_argument('--dry', action='store_true')
-    parser.add_argument('--output', type=str, default='.')
+    parser.add_argument('--url', type=str, required=True, help='URL to specific series comic book on Manhuagui')
+    parser.add_argument('--delay', type=float, required=False, default=1, help='Delay seconds before downloading next page')
+    parser.add_argument('--dry', action='store_true', help='Just parse meta info, will not download pages')
+    parser.add_argument('--output', type=str, default='.', help='Output folder, the default is .')
     args = parser.parse_args()
     output_folder = args.output
 
