@@ -6,7 +6,7 @@ Yet another Python manhuagui downloader.
 python main.py --url=<manga_url>
 ```
 
-this will download the all the corresponding manga series to CWD.
+this will download all the corresponding manga series to CWD.
 
 # Arguments
  - `--url` - URL to specific manga series on manhuagui
